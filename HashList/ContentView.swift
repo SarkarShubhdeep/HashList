@@ -11,12 +11,24 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \TodoList.createdDate, order: .forward) private var todoLists: [TodoList]
+    @State private var navigationPath = NavigationPath()
     
     let columns = [
         GridItem(.adaptive(minimum: 200, maximum: 250), spacing: 16)
     ]
     
     var body: some View {
+        NavigationStack(path: $navigationPath) {
+            homeView
+                .navigationDestination(for: TodoList.ID.self) { listID in
+                    if let list = todoLists.first(where: { $0.id == listID }) {
+                        ListView(list: list)
+                    }
+                }
+        }
+    }
+    
+    private var homeView: some View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(spacing: 0) {
@@ -27,6 +39,7 @@ struct ContentView: View {
                             ForEach(todoLists) { list in
                                 TodoListCard(
                                     list: list,
+                                    onOpen: { navigationPath.append(list.id) },
                                     onDelete: { deleteList(list) },
                                     onRename: { newName in renameList(list, newName: newName) }
                                 )
@@ -153,6 +166,7 @@ struct NewListCard: View {
 
 struct TodoListCard: View {
     let list: TodoList
+    let onOpen: () -> Void
     let onDelete: () -> Void
     let onRename: (String) -> Void
     
@@ -231,7 +245,7 @@ struct TodoListCard: View {
             if isEditing {
                 saveEdit()
             } else {
-                // Open list action
+                onOpen()
             }
         }
     }
@@ -263,4 +277,5 @@ struct TodoListCard: View {
 #Preview {
     ContentView()
         .modelContainer(for: TodoList.self, inMemory: true)
+        .frame(height: 900)
 }

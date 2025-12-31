@@ -14,6 +14,6 @@ struct HashListApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: TodoList.self)
+        .modelContainer(for: TodoList.self, inMemory: false)
     }
 }
