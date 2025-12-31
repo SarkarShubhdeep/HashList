@@ -6,24 +6,11 @@
 //
 
 import SwiftUI
-
-struct TodoList: Identifiable {
-    let id = UUID()
-    let name: String
-    let taskCount: Int
-}
+import SwiftData
 
 struct ContentView: View {
-    @State private var todoLists = [
-        TodoList(name: "Challenges", taskCount: 3),
-        TodoList(name: "Daily Todo", taskCount: 8),
-        TodoList(name: "Academics", taskCount: 12),
-        TodoList(name: "Groceries", taskCount: 5),
-        TodoList(name: "Work", taskCount: 3),
-        TodoList(name: "Chores", taskCount: 5),
-        TodoList(name: "Reminders", taskCount: 9),
-        TodoList(name: "Other", taskCount: 2)
-    ]
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \TodoList.createdDate, order: .forward) private var todoLists: [TodoList]
     
     let columns = [
         GridItem(.adaptive(minimum: 200, maximum: 250), spacing: 16)
@@ -38,7 +25,11 @@ struct ContentView: View {
                     VStack(spacing: 24) {
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(todoLists) { list in
-                                TodoListCard(list: list)
+                                TodoListCard(
+                                    list: list,
+                                    onDelete: { deleteList(list) },
+                                    onRename: { newName in renameList(list, newName: newName) }
+                                )
                             }
                         }
                     }
@@ -48,16 +39,36 @@ struct ContentView: View {
             }
             
             // Fixed Header Card
-            HeaderCard()
+            HeaderCard(onAddList: addNewList)
                 .padding(20)
                 .frame(height: 100, alignment: .top)
                 .frame(maxWidth: 1200)
         }
         .frame(minWidth: 600, minHeight: 400)
     }
+    
+    // MARK: - Data Operations
+    
+    private func addNewList() {
+        let newList = TodoList(name: "New List")
+        modelContext.insert(newList)
+        try? modelContext.save()
+    }
+    
+    private func deleteList(_ list: TodoList) {
+        modelContext.delete(list)
+        try? modelContext.save()
+    }
+    
+    private func renameList(_ list: TodoList, newName: String) {
+        list.name = newName
+        try? modelContext.save()
+    }
 }
 
 struct HeaderCard: View {
+    let onAddList: () -> Void
+    
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             // Background with blur effect
@@ -75,7 +86,7 @@ struct HeaderCard: View {
                 
                 Spacer()
                 HStack(spacing: 16) {
-                    Button(action: {}) {
+                    Button(action: onAddList) {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 14))
@@ -142,19 +153,68 @@ struct NewListCard: View {
 
 struct TodoListCard: View {
     let list: TodoList
+    let onDelete: () -> Void
+    let onRename: (String) -> Void
+    
     @State private var isHovered = false
+    @State private var isEditing = false
+    @State private var editedName: String = ""
+    @State private var showMenu = false
+    @FocusState private var isTextFieldFocused: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("\(list.taskCount) tasks")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
+            HStack {
+                Text("\(list.taskCount) tasks")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                if isHovered {
+                    Menu {
+                        Button("Rename") {
+                            startEditing()
+                        }
+                        
+                        Button("Archive") {
+                            // TODO: Implement archive functionality
+                        }
+                        
+                        Divider()
+                        
+                        Button("Delete", role: .destructive) {
+                            onDelete()
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                            .frame(width: 24, height: 24)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                }
+            }
             
             Spacer()
             
-            Text(list.name)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.primary)
+            if isEditing {
+                TextField("List name", text: $editedName)
+                    .font(.system(size: 16, weight: .medium))
+                    .textFieldStyle(.plain)
+                    .focused($isTextFieldFocused)
+                    .onSubmit {
+                        saveEdit()
+                    }
+                    .onExitCommand {
+                        cancelEdit()
+                    }
+            } else {
+                Text(list.name)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.primary)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -168,11 +228,39 @@ struct TodoListCard: View {
             isHovered = hovering
         }
         .onTapGesture {
-            // Open list action
+            if isEditing {
+                saveEdit()
+            } else {
+                // Open list action
+            }
         }
+    }
+    
+    private func startEditing() {
+        editedName = list.name
+        isEditing = true
+        // Focus the text field after a brief delay to ensure it's rendered
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isTextFieldFocused = true
+        }
+    }
+    
+    private func saveEdit() {
+        if !editedName.isEmpty {
+            onRename(editedName)
+        }
+        isEditing = false
+        isTextFieldFocused = false
+    }
+    
+    private func cancelEdit() {
+        isEditing = false
+        isTextFieldFocused = false
+        editedName = list.name
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(for: TodoList.self, inMemory: true)
 }
