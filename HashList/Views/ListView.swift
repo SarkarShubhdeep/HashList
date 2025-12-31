@@ -417,7 +417,6 @@ struct TaskRow: View {
                     .onExitCommand {
                         cancelEdit()
                     }
-                    .border(Color.blue, width: 4)
             } else {
                 Text(task.title)
                     .frame(maxWidth: .infinity, alignment: .init(horizontal: .leading, vertical: .center))
@@ -427,7 +426,6 @@ struct TaskRow: View {
                     .onTapGesture {
                         startEdit()
                     }
-                    .border(Color.purple, width: 4)
             }
             
             Spacer()
@@ -435,6 +433,10 @@ struct TaskRow: View {
             // 3-dots menu (visible on hover)
             if isHovered {
                 Menu {
+                    Button("Rename") {
+                        startEdit()
+                    }
+                    
                     Button("Move Up") {
                         onMoveUp()
                     }
@@ -459,7 +461,7 @@ struct TaskRow: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
-        .background(isHovered || isSelected ? Color.gray.opacity(0.08) : Color.clear)
+        .background(isHovered || isSelected ? Color.gray.opacity(0.07) : Color.clear)
         .overlay(
             Rectangle()
                 .stroke(Color.gray.opacity(0.1), lineWidth: 1)
@@ -470,6 +472,10 @@ struct TaskRow: View {
             isHovered = hovering
         }
         .contextMenu {
+            Button("Rename") {
+                startEdit()
+            }
+            
             Button("Move Up") {
                 onMoveUp()
             }
