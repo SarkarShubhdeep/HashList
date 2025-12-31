@@ -235,6 +235,7 @@ struct TodoListCard: View {
                 Text(list.name)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.primary)
+                    
             }
         }
         .padding(16)

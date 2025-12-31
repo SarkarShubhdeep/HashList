@@ -383,13 +383,19 @@ struct TaskRow: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Selection checkbox (always visible for easy multi-select)
-            Button(action: onToggleSelection) {
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 18))
-                    .foregroundColor(isSelected ? .blue : .secondary)
+            // Selection checkbox (visible on hover, blank space otherwise)
+            if isHovered {
+                Button(action: onToggleSelection) {
+                    Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 18))
+                        .foregroundColor(isSelected ? .blue : .secondary)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Color.clear
+                    .frame(width: 18, height: 18)
             }
-            .buttonStyle(.plain)
+
             
             // Completion checkbox
             Button(action: onToggleComplete) {
@@ -411,14 +417,17 @@ struct TaskRow: View {
                     .onExitCommand {
                         cancelEdit()
                     }
+                    .border(Color.blue, width: 4)
             } else {
                 Text(task.title)
+                    .frame(maxWidth: .infinity, alignment: .init(horizontal: .leading, vertical: .center))
                     .font(.system(size: 14))
                     .foregroundColor(task.isCompleted ? .secondary : .primary)
                     .strikethrough(task.isCompleted)
                     .onTapGesture {
                         startEdit()
                     }
+                    .border(Color.purple, width: 4)
             }
             
             Spacer()
