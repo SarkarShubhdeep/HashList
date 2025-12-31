@@ -66,6 +66,14 @@ struct ContentView: View {
         let newList = TodoList(name: "New List")
         modelContext.insert(newList)
         try? modelContext.save()
+        updateTaskCount()
+    }
+    
+    private func updateTaskCount() {
+        for list in todoLists {
+            list.taskCount = list.items.count
+        }
+        try? modelContext.save()
     }
     
     private func deleteList(_ list: TodoList) {
@@ -207,7 +215,6 @@ struct TodoListCard: View {
                             .frame(width: 24, height: 24)
                     }
                     .menuStyle(.borderlessButton)
-                    .fixedSize()
                 }
             }
             

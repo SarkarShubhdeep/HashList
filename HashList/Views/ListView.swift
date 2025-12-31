@@ -10,8 +10,12 @@ import SwiftData
 
 struct ListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) var dismiss
     let list: TodoList
     @State private var selectedTaskIds: Set<UUID> = []
+    @State private var isEditingListName = false
+    @State private var editedListName = ""
+    @FocusState private var isListNameFieldFocused: Bool
     
     var sortedItems: [TodoItem] {
         list.items.sorted { $0.order < $1.order }
@@ -46,6 +50,9 @@ struct ListView: View {
                                 },
                                 onMoveDown: {
                                     moveTaskDown(index)
+                                },
+                                onRename: { newTitle in
+                                    renameTask(task, newTitle: newTitle)
                                 }
                             )
                         }
@@ -58,8 +65,14 @@ struct ListView: View {
             // Fixed Header
             ListHeader(
                 listName: list.name,
+                isEditingListName: isEditingListName,
+                editedListName: $editedListName,
                 hasSelection: hasSelection,
                 selectedCount: selectedTaskIds.count,
+                onBackTap: { dismiss() },
+                onListNameTap: startEditingListName,
+                onListNameSave: saveListNameEdit,
+                onListNameCancel: cancelListNameEdit,
                 onAddTask: addTask,
                 onBatchDelete: batchDelete,
                 onBatchComplete: { batchUpdateStatus(completed: true) },
@@ -71,6 +84,9 @@ struct ListView: View {
             .frame(maxWidth: 1200)
         }
         .frame(minWidth: 600, minHeight: 400)
+        .onAppear {
+            editedListName = list.name
+        }
     }
     
     // MARK: - Actions
@@ -91,13 +107,19 @@ struct ListView: View {
     private func deleteTask(_ task: TodoItem) {
         modelContext.delete(task)
         selectedTaskIds.remove(task.id)
+        updateTaskCount()
         try? modelContext.save()
     }
     
     private func addTask() {
         let newTask = TodoItem(title: "New Task", order: sortedItems.count)
         list.items.append(newTask)
+        updateTaskCount()
         try? modelContext.save()
+    }
+    
+    private func updateTaskCount() {
+        list.taskCount = list.items.count
     }
     
     private func moveTaskUp(_ index: Int) {
@@ -127,6 +149,7 @@ struct ListView: View {
             }
         }
         selectedTaskIds.removeAll()
+        updateTaskCount()
         try? modelContext.save()
     }
     
@@ -143,17 +166,54 @@ struct ListView: View {
     private func deselectAll() {
         selectedTaskIds.removeAll()
     }
+    
+    private func startEditingListName() {
+        isEditingListName = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isListNameFieldFocused = true
+        }
+    }
+    
+    private func saveListNameEdit() {
+        if !editedListName.isEmpty {
+            list.name = editedListName
+            try? modelContext.save()
+        }
+        isEditingListName = false
+        isListNameFieldFocused = false
+    }
+    
+    private func cancelListNameEdit() {
+        isEditingListName = false
+        isListNameFieldFocused = false
+        editedListName = list.name
+    }
+    
+    private func renameTask(_ task: TodoItem, newTitle: String) {
+        if !newTitle.isEmpty {
+            task.title = newTitle
+            try? modelContext.save()
+        }
+    }
 }
 
 struct ListHeader: View {
     let listName: String
+    let isEditingListName: Bool
+    @Binding var editedListName: String
     let hasSelection: Bool
     let selectedCount: Int
+    let onBackTap: () -> Void
+    let onListNameTap: () -> Void
+    let onListNameSave: () -> Void
+    let onListNameCancel: () -> Void
     let onAddTask: () -> Void
     let onBatchDelete: () -> Void
     let onBatchComplete: () -> Void
     let onBatchPending: () -> Void
     let onDeselectAll: () -> Void
+    
+    @FocusState private var isFocused: Bool
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -167,6 +227,16 @@ struct ListHeader: View {
             
             // Content
             HStack {
+                // Back button
+                Button(action: onBackTap) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                
                 if hasSelection {
                     // Batch operation mode
                     HStack(spacing: 12) {
@@ -225,8 +295,29 @@ struct ListHeader: View {
                     }
                 } else {
                     // Normal mode
-                    Text(listName)
-                        .font(.system(size: 18, weight: .semibold))
+                    if isEditingListName {
+                        TextField("List name", text: $editedListName)
+                            .font(.system(size: 18, weight: .semibold))
+                            .textFieldStyle(.plain)
+                            .focused($isFocused)
+                            .onAppear {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    isFocused = true
+                                }
+                            }
+                            .onSubmit {
+                                onListNameSave()
+                            }
+                            .onExitCommand {
+                                onListNameCancel()
+                            }
+                    } else {
+                        Text(listName)
+                            .font(.system(size: 18, weight: .semibold))
+                            .onTapGesture {
+                                onListNameTap()
+                            }
+                    }
                     
                     Spacer()
                     
@@ -253,6 +344,9 @@ struct ListHeader: View {
                         .buttonStyle(.plain)
                         
                         Menu {
+                            Button("Rename") {
+                                onListNameTap()
+                            }
                             Button("Sort by Date") {}
                             Button("Sort by Status") {}
                             Divider()
@@ -280,8 +374,12 @@ struct TaskRow: View {
     let onDelete: () -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
+    let onRename: (String) -> Void
     
     @State private var isHovered = false
+    @State private var isEditingTitle = false
+    @State private var editedTitle = ""
+    @FocusState private var isTitleFieldFocused: Bool
     
     var body: some View {
         HStack(spacing: 16) {
@@ -301,11 +399,27 @@ struct TaskRow: View {
             }
             .buttonStyle(.plain)
             
-            // Task title
-            Text(task.title)
-                .font(.system(size: 14))
-                .foregroundColor(task.isCompleted ? .secondary : .primary)
-                .strikethrough(task.isCompleted)
+            // Task title - editable on click
+            if isEditingTitle {
+                TextField("Task title", text: $editedTitle)
+                    .font(.system(size: 14))
+                    .textFieldStyle(.plain)
+                    .focused($isTitleFieldFocused)
+                    .onSubmit {
+                        saveEdit()
+                    }
+                    .onExitCommand {
+                        cancelEdit()
+                    }
+            } else {
+                Text(task.title)
+                    .font(.system(size: 14))
+                    .foregroundColor(task.isCompleted ? .secondary : .primary)
+                    .strikethrough(task.isCompleted)
+                    .onTapGesture {
+                        startEdit()
+                    }
+            }
             
             Spacer()
             
@@ -361,6 +475,26 @@ struct TaskRow: View {
                 onDelete()
             }
         }
+    }
+    
+    private func startEdit() {
+        editedTitle = task.title
+        isEditingTitle = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isTitleFieldFocused = true
+        }
+    }
+    
+    private func saveEdit() {
+        onRename(editedTitle)
+        isEditingTitle = false
+        isTitleFieldFocused = false
+    }
+    
+    private func cancelEdit() {
+        isEditingTitle = false
+        isTitleFieldFocused = false
+        editedTitle = task.title
     }
 }
 
