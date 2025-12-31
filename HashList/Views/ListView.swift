@@ -358,6 +358,7 @@ struct ListHeader: View {
                                 .background(Color.white.opacity(0.2))
                         }
                         .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
                     }
                 }
             }
@@ -457,6 +458,7 @@ struct TaskRow: View {
                         .frame(width: 24, height: 24)
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
             }
         }
         .padding(.vertical, 12)
