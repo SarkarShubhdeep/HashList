@@ -29,7 +29,7 @@ struct ListView: View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(spacing: 0) {
-                    Color.clear.frame(height: 140)
+                    Color.clear.frame(height: 180)
                     
                     VStack(spacing: 0) {
                         ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, task in
@@ -63,25 +63,32 @@ struct ListView: View {
             }
             
             // Fixed Header
-            ListHeader(
-                listName: list.name,
-                isEditingListName: isEditingListName,
-                editedListName: $editedListName,
-                hasSelection: hasSelection,
-                selectedCount: selectedTaskIds.count,
-                onBackTap: { dismiss() },
-                onListNameTap: startEditingListName,
-                onListNameSave: saveListNameEdit,
-                onListNameCancel: cancelListNameEdit,
-                onAddTask: addTask,
-                onBatchDelete: batchDelete,
-                onBatchComplete: { batchUpdateStatus(completed: true) },
-                onBatchPending: { batchUpdateStatus(completed: false) },
-                onDeselectAll: deselectAll
-            )
-            .padding(20)
-            .frame(height: 100, alignment: .topLeading)
-            .frame(maxWidth: 1200)
+            VStack(spacing: 0) {
+                ListHeader(
+                    listName: list.name,
+                    isEditingListName: isEditingListName,
+                    editedListName: $editedListName,
+                    hasSelection: hasSelection,
+                    selectedCount: selectedTaskIds.count,
+                    onBackTap: { dismiss() },
+                    onListNameTap: startEditingListName,
+                    onListNameSave: saveListNameEdit,
+                    onListNameCancel: cancelListNameEdit,
+                    onAddTask: addTask,
+                    onBatchDelete: batchDelete,
+                    onBatchComplete: { batchUpdateStatus(completed: true) },
+                    onBatchPending: { batchUpdateStatus(completed: false) },
+                    onDeselectAll: deselectAll
+                )
+                .padding(20)
+                .frame(height: 100, alignment: .topLeading)
+                
+                TaskStatsBar(
+                    totalTasks: list.items.count,
+                    completedTasks: list.items.filter { $0.isCompleted }.count
+                )
+                .frame(maxWidth: 1200)
+            }
         }
         .frame(minWidth: 600, minHeight: 400)
         .onAppear {
@@ -344,9 +351,6 @@ struct ListHeader: View {
                         .buttonStyle(.plain)
                         
                         Menu {
-                            Button("Rename") {
-                                onListNameTap()
-                            }
                             Button("Sort by Date") {}
                             Button("Sort by Status") {}
                             Divider()
@@ -364,6 +368,52 @@ struct ListHeader: View {
             }
             .padding(16)
         }
+    }
+}
+
+struct TaskStatsBar: View {
+    let totalTasks: Int
+    let completedTasks: Int
+    @State private var selectedSort = "default"
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Left side - Task stats
+            Text("\(totalTasks) tasks | \(completedTasks) completed")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+            
+            Spacer()
+            
+            // Right side - Sort options
+            Menu {
+                Button("Default Order", action: { selectedSort = "default" })
+                Button("By Date", action: { selectedSort = "date" })
+                Button("By Status", action: { selectedSort = "status" })
+                Button("A-Z", action: { selectedSort = "alpha" })
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 13))
+                    Text("Sort")
+                        .font(.system(size: 13))
+                }
+                .frame(height: 28)
+                .padding(.horizontal, 10)
+                .background(Color.gray.opacity(0.1))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color.white.opacity(0.05))
+        .overlay(
+            Rectangle()
+                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                .frame(height: 1),
+            alignment: .top
+        )
     }
 }
 
